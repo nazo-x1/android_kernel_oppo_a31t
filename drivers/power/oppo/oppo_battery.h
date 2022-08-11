@@ -24,9 +24,9 @@
 #define HYS_NONE										0
 #define HYSTERISIS_DECIDEGC                     		20
 
-#define LCD_ON_CHARGING_INPUT_CURRENT_14045				1200
+#define LCD_ON_CHARGING_INPUT_CURRENT_14045				900
 #define LCD_OFF_CHARGING_INPUT_CURRENT_14045				1500
-#define LCD_ON_CHARGING_FAST_CURRENT_14045				1000
+#define LCD_ON_CHARGING_FAST_CURRENT_14045				900
 #define LCD_OFF_CHARGING_FAST_CURRENT_14045				1500
 
 #define LCD_ON_CHARGING_INPUT_CURRENT_15011				1200
@@ -36,6 +36,12 @@
 
 #define LCD_ON_CHARGING_INPUT_CURRENT_15005				700
 #define LCD_OFF_CHARGING_INPUT_CURRENT_15005			1000
+
+#define LCD_ON_CHARGING_FAST_CURRENT_15009				650
+#define LCD_OFF_CHARGING_FAST_CURRENT_15009				1000
+
+#define LCD_ON_CHARGING_INPUT_CURRENT_15018				1200
+#define LCD_OFF_CHARGING_INPUT_CURRENT_15018			2000
 
 #define CAMERA_ON_CHARGING_INPUT_CURRENT					1000
 #define CAMERA_OFF_CHARGING_INPUT_CURRENT					1500
@@ -78,6 +84,7 @@ OPPO_BATTERY_EXT void opchg_get_adc_notification(enum qpnp_tm_state state, void 
 OPPO_BATTERY_EXT void opchg_get_adc_notification(struct opchg_charger *chip);
 #endif
 OPPO_BATTERY_EXT void opchg_get_charger_ov_status(struct opchg_charger *chip);
+OPPO_BATTERY_EXT void opchg_get_battery_ov_status(struct opchg_charger *chip);
 OPPO_BATTERY_EXT void opchg_config_reset_charger(struct opchg_charger *chip, int reason, int reset);
 OPPO_BATTERY_EXT void opchg_config_input_chg_current(struct opchg_charger *chip, int reason, int mA);
 OPPO_BATTERY_EXT void opchg_config_over_time(struct opchg_charger *chip, int mA);
@@ -91,7 +98,7 @@ OPPO_BATTERY_EXT void opchg_config_charging_phase(struct opchg_charger *chip,int
 OPPO_BATTERY_EXT void opchg_get_prop_fastcharger_status(struct opchg_charger *chip);
 #endif
 OPPO_BATTERY_EXT void opchg_check_status(struct opchg_charger *chip);
-OPPO_BATTERY_EXT void opchg_set_status(struct opchg_charger *chip);
+OPPO_BATTERY_EXT void opchg_set_status(struct opchg_charger *chip, bool input_curr_set);
 OPPO_BATTERY_EXT void opchg_update_thread(struct work_struct *work);
 OPPO_BATTERY_EXT void opchg_delayed_wakeup_thread(struct work_struct *work);
 OPPO_BATTERY_EXT void opchg_works_init(struct opchg_charger *chip);

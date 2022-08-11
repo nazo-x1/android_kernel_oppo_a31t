@@ -26,6 +26,21 @@ enum {
     OPCHG_CHG_TEMP_HOT,			//	>55
 };
 
+// batterynotify is int type ,so define max bit(14)
+#define 	Notify_Charger_Over_Vol                   	BIT(1)// 1 // charger voltage high
+#define	Notify_Charger_Low_Vol                    	BIT(2)// 2 // charger voltage low
+#define	Notify_Bat_Over_Temp                      	BIT(3)// 3 // battery temp high
+#define	Notify_Bat_Low_Temp                       	BIT(4)// 4 // battery temp low
+#define	Notify_Bat_Not_Connect                    	BIT(5)// 5 // battery disconnect
+#define	Notify_Bat_Over_Vol                       	BIT(6)// 6 // battery voltage high
+#define	Notify_Bat_Full                           	BIT(7)// 7 // normal charger full
+#define	Notify_Chging_Current                     	BIT(8)// 8 
+#define	Notify_Chging_OverTime					  	BIT(9)// 9 // time out charegr full
+#define	Notify_Bat_Full_High_Temp			  			BIT(10)// 10// high_temp charger full
+#define	Notify_Bat_Full_Low_Temp			  			BIT(11)// 11// low_temp charger full
+#define	Notify_Bat_Full_THIRD_BATTERY					BIT(14)// 14   // no_thirdbat charger full
+#define	Notify_Bat_MAX								BIT(14)// 14   
+
 typedef enum   
 {
 	/*! Battery is absent               */
@@ -186,14 +201,18 @@ struct opchg_charger {
 	int								charging_disabled_status;
     
     /* status tracking */
+	bool                            batt_ovp;
     bool                            batt_pre_full;
+	bool							batt_pre_full_smb358;
     bool                            batt_full;
     bool                            batt_hot;
     bool                            batt_cold;
     bool                            batt_warm;
+	bool                            batt_normal;
     bool                            batt_cool;
     bool                            charge_voltage_over;
     bool                            batt_voltage_over;
+	int								batterynotify;
 #ifdef VENDOR_EDIT
     bool                            multiple_test;
 #endif
@@ -224,6 +243,8 @@ struct opchg_charger {
     struct delayed_work             opchg_delayed_wakeup_work;
 	struct work_struct				opchg_modify_tp_param_work;
 	struct work_struct				bq24196_usbin_valid_work;
+	struct work_struct				bq24157_usbin_valid_work;
+	struct work_struct				bq24188_usbin_valid_work;
     struct wakeup_source            source;
     
     struct opchg_regulator         otg_vreg;
@@ -236,23 +257,24 @@ struct opchg_charger {
     struct qpnp_adc_tm_btm_param    adc_param;
 
 	int								fast_charge_project;
-    int                             	fastchg_current_max_ma;
-    int                             	limit_current_max_ma;
-    int                             	iterm_ma;
-    int                             	vfloat_mv;
-    int                             	recharge_mv;
+	
+    int                             fastchg_current_max_ma;
+    int                             limit_current_max_ma;
+    int                             iterm_ma;
+    int                             vfloat_mv;
+    int                             recharge_mv;
 	
     int                             hot_bat_decidegc;
-    int                             	temp_hot_vfloat_mv;
-    int                             	temp_hot_fastchg_current_ma;
+    int                             temp_hot_vfloat_mv;
+    int                             temp_hot_fastchg_current_ma;
 	
     int                             warm_bat_decidegc;
     int                             temp_warm_vfloat_mv;
     int                             temp_warm_fastchg_current_ma;
 	
-	int                             	pre_normal_bat_decidegc;
-    int                             	temp_pre_normal_vfloat_mv;
-    int                             	temp_pre_normal_fastchg_current_ma;	
+	int                             pre_normal_bat_decidegc;
+    int                             temp_pre_normal_vfloat_mv;
+    int                             temp_pre_normal_fastchg_current_ma;	
 	
     int                             pre_cool_bat_decidegc;
     int                             temp_pre_cool_vfloat_mv;
@@ -358,11 +380,13 @@ struct opchg_charger {
 	int 							vindpm_vol;
 	int								vindpm_level;
 	int								sw_aicl_point;
+	int								sw_eoc_count;
 
 	atomic_t						bms_suspended;
 	unsigned long					soc_update_time;
 	unsigned long					soc_update_pre_time;
 	bool							check_stat_again;
+	bool							power_off;
 };
 
 struct opchg_gpio_control {

@@ -27,7 +27,7 @@
 #define OPCHG_SOC_CHANGE_60S			12
 #define OPCHG_SOC_CHANGE_35S			7
 #define OPCHG_SOC_CHANGE_150S			30
-#define OPCHG_SOC_CHANGE_300S			60
+#define OPCHG_SOC_CHANGE_300S			66
 #define EIGHT_MINUTES					480
 
 OPPO_BMS_EXT	int opchg_get_prop_fast_chg_started(struct opchg_charger *chip);
@@ -44,6 +44,7 @@ OPPO_BMS_EXT	int opchg_get_prop_authenticate(struct opchg_charger *chip);
 OPPO_BMS_EXT	int opchg_get_prop_batt_capacity(struct opchg_charger *chip);
 OPPO_BMS_EXT	int opchg_get_prop_current_now(struct opchg_charger *chip);
 OPPO_BMS_EXT	int opchg_get_prop_batt_health(struct opchg_charger *chip);
+OPPO_BMS_EXT	int opchg_battery_notify_check(struct opchg_charger *chip);
 OPPO_BMS_EXT	bool opchg_get_prop_batt_present(struct opchg_charger *chip);
 OPPO_BMS_EXT	int opchg_backup_ocv_soc(int soc);
 OPPO_BMS_EXT	int msmrtc_alarm_read_time(struct rtc_time *tm);

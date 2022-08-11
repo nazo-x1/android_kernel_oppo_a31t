@@ -98,7 +98,14 @@ int opchg_parse_dt(struct opchg_charger *chip)
     #endif
 
 	#ifdef OPPO_USE_QCOMM
-    chip->usbin_switch_gpio = of_get_named_gpio_flags(node, "qcom,usbin-switch-gpio", 0, &gpio_flags);
+    #ifdef VENDOR_EDIT
+    /*chaoying.chen@EXP.BaseDrv.charge,2015/07/04 modify  for 15085*/
+    if(is_project(OPPO_15085)){
+         chip->usbin_switch_gpio = of_get_named_gpio_flags(node, "qcom,usbin_switch-gpio", 0, &gpio_flags);
+    } else {
+         chip->usbin_switch_gpio = of_get_named_gpio_flags(node, "qcom,usbin-switch-gpio", 0, &gpio_flags);
+    }
+    #endif /*VENDOR_EDIT*/
 	pr_err("%s usbin_switch_gpio:%d\n",__func__,chip->usbin_switch_gpio);
     if (!gpio_is_valid(chip->usbin_switch_gpio)) {
         dev_dbg(chip->dev, "Invalid usbin-switch-gpio");
@@ -175,11 +182,15 @@ int opchg_parse_dt(struct opchg_charger *chip)
     chip->float_compensation_mv = 100;
 	#endif
  #endif
- 
+
+ 	//======================================================
+ 	// step1: get charger_ic_chip_id and  bms_ic_chip_id and  fast_charging_sign
+ 	//======================================================
     #ifdef OPPO_USE_QCOMM
     rc = of_property_read_u32(node, "qcom,fast-charger-project-sign", &chip->fast_charge_project);
     if (rc) {
-		if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)||is_project(OPPO_15018))
+	/*#hanqing.wang@EXP.BasicDrv.Audio add for clone 15089 and add the macor MSM_15062 and OPPO_15011 = OPPO_15018*/
+		if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)||is_project(OPPO_15018) || is_project(OPPO_15022))
 		{
 			chip->fast_charge_project = true;
 		}
@@ -193,6 +204,10 @@ int opchg_parse_dt(struct opchg_charger *chip)
     #endif
 
  
+
+	//======================================================
+ 	// step2: Get charging control parameters
+ 	//======================================================
 	#ifdef OPPO_USE_QCOMM
  	rc = of_property_read_u32(node, "qcom,iterm-ma", &chip->iterm_ma);
  	if (rc < 0) {
@@ -239,7 +254,10 @@ int opchg_parse_dt(struct opchg_charger *chip)
 	#elif defined(OPPO_USE_MTK)
  	chip->vfloat_mv = 4320;
 	#endif
-    
+
+	//======================================================
+ 	// step3: Get charging temperature range of control parameters
+ 	//======================================================
     #ifdef OPPO_USE_QCOMM
     rc = of_property_read_u32(node, "qcom,hot_bat_decidegc", &chip->hot_bat_decidegc);
     if (rc < 0) {
@@ -484,9 +502,18 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     chip->usb_psy = usb_psy;
     chip->fake_battery_soc = -EINVAL;
 
-    chip->driver_id = id->driver_data;
 	chip->boot_mode = get_boot_mode();
-	opchg_chip = chip;
+	chip->driver_id = id->driver_data;
+	if(is_project(OPPO_15035)){
+		chip->driver_id = OPCHG_BQ24188_ID;
+		dev_dbg(chip->dev, "opcharger_i2c_id=%d\n",chip->driver_id);
+	}
+
+	if(is_project(OPPO_15005) || is_project(OPPO_15025)|| is_project(OPPO_15035)){
+
+	} else {
+		opchg_chip = chip;
+	}
     dev_dbg(chip->dev, "opcharger_i2c_id=%d,boot_mode =%d\n",chip->driver_id,chip->boot_mode);
     
     /* early for VADC get, defer probe if needed */
@@ -496,7 +523,6 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
         if (rc != -EPROBE_DEFER) {
             pr_debug("vadc property missing\n");
         }
-        
         return rc;
     }
     
@@ -506,7 +532,6 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
         if (rc != -EPROBE_DEFER) {
             pr_debug("adc_tm property missing\n");
         }
-        
         return rc;
 	}
 	
@@ -534,12 +559,34 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     
     mutex_init(&chip->read_write_lock);
     /* probe the device to check if its actually connected */
-    rc = opchg_read_reg(chip, INPUT_CURRENT_LIMIT_REG, &reg);
-    if (rc) {
-        pr_debug("Failed to detect OPCHARGER, device may be absent\n");
-        return -ENODEV;
-    }
-    
+	if(is_project(OPPO_15005)){
+		if(get_PCB_Version() == 6 && chip->driver_id == OPCHG_SMB358_ID){
+			pr_err("15005 no smb358 device\n");
+			return -ENODEV;
+		} else if(get_PCB_Version() != 6 && chip->driver_id == OPCHG_BQ24188_ID){
+			pr_err("15005 no bq24188 device\n");
+			return -ENODEV;
+		}
+	} else if(is_project(OPPO_15025)){
+		if(get_PCB_Version() <= 5 && chip->driver_id == OPCHG_SMB358_ID){
+			pr_err("15025 no smb358 device\n");
+			return -ENODEV;
+		} else if(get_PCB_Version() > 5 && chip->driver_id == OPCHG_BQ24157_ID){
+			pr_err("15025 no bq24157 device\n");
+			return -ENODEV;
+		}
+	}
+
+	
+	if(is_project(OPPO_15005) || is_project(OPPO_15025)|| is_project(OPPO_15035))
+		opchg_chip = chip;
+	
+	rc = opchg_read_reg(chip, 0x00, &reg);
+	if (rc) {
+		pr_debug("Failed to detect OPCHARGER, device may be absent\n");
+		return -ENODEV;
+	}
+	
     rc = opchg_parse_dt(chip);
     if (rc) {
         dev_err(&client->dev, "Couldn't parse DT nodes rc=%d\n", rc);
@@ -548,8 +595,12 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
     
 	opchg_init_charge_parameters(chip);
 
-	if(is_project(OPPO_14043) || is_project(OPPO_14037) || is_project(OPPO_14051) 
-		|| is_project(OPPO_15005) || is_project(OPPO_15057) || is_project(OPPO_15025)){
+
+/*chaoying.chen@EXP.BaseDrv.charge,2015/07/02  modify  for 15085*/
+	if(is_project(OPPO_14043)  || is_project(OPPO_14037) || is_project(OPPO_14051)|| 
+		is_project(OPPO_15005) || is_project(OPPO_15057) || is_project(OPPO_15025)|| 
+		is_project(OPPO_15009) || is_project(OPPO_15037) || is_project(OPPO_15035)||
+        is_project(OPPO_15085) ) {
 		if(gpio_is_valid(chip->usbin_switch_gpio)){
 			rc = gpio_request(chip->usbin_switch_gpio,"opcharger_usbin_switch");
 			if(rc)
@@ -564,6 +615,14 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
 	}	
 	
 	i2c_set_clientdata(client, chip);
+
+	rc = opchg_hw_init(chip);
+    if (rc) {
+        dev_err(&client->dev, "Couldn't intialize hardware rc=%d\n", rc);
+        goto fail_opchg_hw_init;
+    }
+	if(is_project(OPPO_15025) || is_project(OPPO_15005))
+		opchg_dump_regs(chip);
 	
 	opchg_dc_property_config(chip);
 	rc = power_supply_register(chip->dev, &chip->dc_psy);
@@ -582,18 +641,10 @@ static int opcharger_charger_probe(struct i2c_client *client, const struct i2c_d
         return rc;
     }
 
-    //opchg_dump_regs(chip);
-    
 	rc = opchg_regulator_init(chip);
     if (rc) {
         dev_err(&client->dev, "Couldn't initialize OPCHARGER ragulator rc=%d\n", rc);
         return rc;
-    }
-    
-    rc = opchg_hw_init(chip);
-    if (rc) {
-        dev_err(&client->dev, "Couldn't intialize hardware rc=%d\n", rc);
-        goto fail_opchg_hw_init;
     }
     
     opchg_works_init(chip);
@@ -804,6 +855,25 @@ static int opcharger_resume(struct device *dev)
     return 0;
 }
 
+static void opcharger_charger_shutdown(struct i2c_client *client)
+{
+    struct opchg_charger *chip = i2c_get_clientdata(client);
+
+	if(is_project(OPPO_15025)){
+		if(chip->driver_id == OPCHG_BQ24157_ID){
+			opchg_set_reset_charger(chip, true);
+			msleep(20);
+			pr_err("%s 15025 reset charger\n",__func__);
+		}
+	} else if(is_project(OPPO_15005)){
+		if(chip->driver_id == OPCHG_BQ24188_ID){
+			opchg_get_charging_status(chip);
+			msleep(20);
+			pr_err("%s 15005 read i2c\n",__func__);
+		}
+	}
+}
+
 static const struct dev_pm_ops opcharger_pm_ops = {
     .suspend	= opcharger_suspend,
     .resume		= opcharger_resume,
@@ -813,6 +883,8 @@ static struct of_device_id opcharger_match_table[] = {
     { .compatible = "qcom,smb358-charger"},
     { .compatible = "qcom,smb1357-charger"},
     { .compatible = "ti,bq24196-charger"},
+    { .compatible = "ti,bq24157-charger"},
+    { .compatible = "ti,bq24188-charger"},
     { },
 };
 
@@ -820,6 +892,8 @@ static const struct i2c_device_id opcharger_charger_id[] = {
     {"smb358-charger", OPCHG_SMB358_ID},
     {"smb1357-charger", OPCHG_SMB1357_ID},
     {"bq24196-charger", OPCHG_BQ24196_ID},
+    {"bq24157-charger", OPCHG_BQ24157_ID},
+    {"bq24188-charger", OPCHG_BQ24188_ID},
     {},
 };
 MODULE_DEVICE_TABLE(i2c, opcharger_charger_id);
@@ -833,6 +907,7 @@ static struct i2c_driver opcharger_charger_driver = {
     },
     .probe		= opcharger_charger_probe,
     .remove		= opcharger_charger_remove,
+    .shutdown	= opcharger_charger_shutdown,
     .id_table	= opcharger_charger_id,
 };
 

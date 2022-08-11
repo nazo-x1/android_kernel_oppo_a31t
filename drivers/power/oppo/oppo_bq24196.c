@@ -331,10 +331,16 @@ int bq24196_set_fastchg_current(struct opchg_charger *chip, int ifast_mA)
 {
     u8 value;
 
-	if(is_project(OPPO_14037) || is_project(OPPO_15057)){
+/*huqiao@EXP.BasicDrv.Basic add for clone 15085*/
+	if(is_project(OPPO_14037) || is_project(OPPO_15057) || is_project(OPPO_15009) || is_project(OPPO_15037)|| is_project(OPPO_15085)){
 		if((!chip->batt_authen) && (ifast_mA > chip->non_standard_fastchg_current_ma))
 			ifast_mA = chip->non_standard_fastchg_current_ma;
 	}
+/*huqiao@EXP.BasicDrv.Basic add for clone 15085*/
+	if(is_project(OPPO_14037) || is_project(OPPO_14051) || is_project(OPPO_15057) || is_project(OPPO_15009) || is_project(OPPO_15037)|| is_project(OPPO_15085))
+
+		dev_dbg(chip->dev, "%s ibatmax:%d",__func__,ifast_mA);
+
 #if 1
 	if(ifast_mA < BQ24196_MIN_FAST_CURRENT_MA_ALLOWED){
 		if(ifast_mA > BQ24196_MAX_FAST_CURRENT_MA_20_PERCENT)
@@ -356,9 +362,6 @@ int bq24196_set_fastchg_current(struct opchg_charger *chip, int ifast_mA)
 	    value = (ifast_mA - BQ24196_MIN_FAST_CURRENT_MA)/BQ24196_FAST_CURRENT_STEP_MA;
 	    value <<= REG02_BQ24196_FAST_CHARGING_CURRENT_LIMIT_SHIFT;
 	}
-	
-	if(is_project(OPPO_14037) || is_project(OPPO_14051) || is_project(OPPO_15057))
-		dev_dbg(chip->dev, "%s ibatmax:%d",__func__,ifast_mA);
 	
 	return opchg_masked_write(chip, REG02_BQ24196_ADDRESS, REG02_BQ24196_FAST_CHARGING_CURRENT_LIMIT_MASK | REG02_BQ24196_FAST_CHARGING_CURRENT_FORCE20PCT_MASK, value);
 }
@@ -410,6 +413,7 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 {
 	u8 aicl_count = 0;
 	int chg_vol;
+	int iusbmax = 0;
 
     chip->is_charger_det = 1;
 	
@@ -419,14 +423,14 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
         iusbin_mA = USB2_MAX_CURRENT_MA;
 
 	#ifdef OPCHARGER_DEBUG_ENABLE
-	pr_err("%s iusbin_mA:%d,aicl_current:%d,fast_current:%d,aicl_enable:%d new\n",__func__,
-		iusbin_mA,chip->aicl_current,chip->max_fast_current[FAST_CURRENT_MIN],aicl_enable);
+	pr_err("%s iusbin_mA:%d,aicl_current:%d,fast_current:%d,max_current:%d,aicl_enable:%d\n",__func__,
+		iusbin_mA,chip->aicl_current,chip->max_fast_current[FAST_CURRENT_MIN],chip->limit_current_max_ma,aicl_enable);
 	#endif
 	
 	// set current < 500mA
 	if(iusbin_mA <= CURRENT_500MA){
 		bq24196_iusbmax_set_noaicl(chip, iusbin_mA);
-		pr_err("%s  set charger input current end,set current=%d\n",__func__,iusbin_mA);
+		pr_err("%s no aicl 500ma,iusbin_mA:%d\n",__func__,iusbin_mA);
 		chip->is_charger_det = 0;
 		return 0;
 	}
@@ -459,19 +463,22 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		chg_vol = opchg_get_prop_charger_voltage_now(chip);
 		if(chg_vol < chip->sw_aicl_point){
 			chip->aicl_current = CURRENT_500MA;
-			bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+			iusbmax = min(iusbin_mA, chip->aicl_current);
+			bq24196_iusbmax_set_noaicl(chip, iusbmax);
 			chip->aicl_working = false;
-			pr_err("%s  set charger input ccurrent end,set current=500ma_1,chg_vol:%d\n",__func__,chg_vol);
+			pr_err("%s aicl end 500ma_1,chg_vol:%d,iusbmax:%d\n",
+					__func__,chg_vol,iusbmax);
 			bq24196_usb_plugout_check_whenaicl(chip);
 			chip->is_charger_det = 0;
 			return 0;
 		}
 	}
-	if(iusbin_mA < CURRENT_900MA){
+	if(chip->limit_current_max_ma < CURRENT_900MA){
 		chip->aicl_current = CURRENT_500MA;
-		bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+		iusbmax = min(iusbin_mA, chip->aicl_current);
+		bq24196_iusbmax_set_noaicl(chip, iusbmax);
 		chip->aicl_working = false;
-		pr_err("%s set charger input ccurrent end,set current=500ma_1\n",__func__);
+		pr_err("%s aicl end 500ma_2,iusbmax:%d\n",__func__,iusbmax);
 		chip->is_charger_det = 0;
 		return 0;
 	}
@@ -483,19 +490,22 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		chg_vol = opchg_get_prop_charger_voltage_now(chip);
 		if(chg_vol < chip->sw_aicl_point){
 			chip->aicl_current = CURRENT_500MA;
-			bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
-			pr_err("%s  set charger input ccurrent end,set current=500ma_2,chg_vol:%d\n",__func__,chg_vol);
+			iusbmax = min(iusbin_mA, chip->aicl_current);
+			bq24196_iusbmax_set_noaicl(chip, iusbmax);
+			pr_err("%s aicl end 500ma_3,chg_vol:%d,iusbmax:%d\n",
+					__func__,chg_vol,iusbmax);
 			bq24196_usb_plugout_check_whenaicl(chip);
 			chip->aicl_working = false;
 			chip->is_charger_det = 0;
 			return 0;
 		}
 	}
-	if(iusbin_mA < CURRENT_1200MA){
+	if(chip->limit_current_max_ma < CURRENT_1200MA){
 		chip->aicl_current = CURRENT_900MA;
-		bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+		iusbmax = min(iusbin_mA, chip->aicl_current);
+		bq24196_iusbmax_set_noaicl(chip, iusbmax);
 		chip->aicl_working = false;
-		pr_err("%s  set charger input ccurrent end,set current=500ma_2\n",__func__);
+		pr_err("%s aicl end 900ma_1,iusbmax:%d\n",__func__,iusbmax);
 		chip->is_charger_det = 0;
 		return 0;
 	}
@@ -507,19 +517,22 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		chg_vol = opchg_get_prop_charger_voltage_now(chip);
 		if(chg_vol < chip->sw_aicl_point){
 			chip->aicl_current = CURRENT_900MA;
-			bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
-			pr_err("%s  set charger input ccurrent end,set current=900ma,chg_vol:%d\n",__func__,chg_vol);
+			iusbmax = min(iusbin_mA, chip->aicl_current);
+			bq24196_iusbmax_set_noaicl(chip, iusbmax);
+			pr_err("%s aicl end 900ma_2,chg_vol:%d,iusbmax:%d\n",
+					__func__,chg_vol,iusbmax);
 			chip->aicl_working = false;
 			bq24196_usb_plugout_check_whenaicl(chip);
 			chip->is_charger_det = 0;
 			return 0;
 		}
 	}
-	if(iusbin_mA < CURRENT_1500MA){
+	if(chip->limit_current_max_ma < CURRENT_1500MA){
 		chip->aicl_current = CURRENT_1200MA;
-		bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+		iusbmax = min(iusbin_mA, chip->aicl_current);
+		bq24196_iusbmax_set_noaicl(chip, iusbmax);
 		chip->aicl_working = false;
-		pr_err("%s  set charger input ccurrent end,set current=900ma\n",__func__);
+		pr_err("%s aicl end 1200ma_1,iusbmax:%d\n",__func__,iusbmax);
 		chip->is_charger_det = 0;
 		return 0;
 	}
@@ -531,19 +544,22 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		chg_vol = opchg_get_prop_charger_voltage_now(chip);
 		if(chg_vol < chip->sw_aicl_point){
 			chip->aicl_current = CURRENT_1200MA;
-			bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
-			pr_err("%s  set charger input ccurrent end,set current=1200ma,chg_vol:%d\n",__func__,chg_vol);
+			iusbmax = min(iusbin_mA, chip->aicl_current);
+			bq24196_iusbmax_set_noaicl(chip, iusbmax);
+			pr_err("%s aicl end 1200ma_2,chg_vol:%d,iusbmax:%d\n",
+					__func__,chg_vol,iusbmax);
 			chip->aicl_working = false;
 			bq24196_usb_plugout_check_whenaicl(chip);
 			chip->is_charger_det = 0;
 			return 0;
 		}
 	}
-	if(iusbin_mA < CURRENT_2000MA){
+	if(chip->limit_current_max_ma < CURRENT_2000MA){
 		chip->aicl_current = CURRENT_1500MA;
-		bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+		iusbmax = min(iusbin_mA, chip->aicl_current);
+		bq24196_iusbmax_set_noaicl(chip, iusbmax);
 		chip->aicl_working = false;
-		pr_err("%s  set charger input ccurrent end,set current=1500ma\n",__func__);
+		pr_err("%s aicl end 1500ma_1,iusbmax:%d\n",__func__,iusbmax);
 		chip->is_charger_det = 0;
 		return 0;
 	}
@@ -555,8 +571,10 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		chg_vol = opchg_get_prop_charger_voltage_now(chip);
 		if(chg_vol < chip->sw_aicl_point){
 			chip->aicl_current = CURRENT_1500MA;
-			bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
-			pr_err("%s  set charger input ccurrent end,set current=1500ma,chg_vol:%d\n",__func__,chg_vol);
+			iusbmax = min(iusbin_mA, chip->aicl_current);
+			bq24196_iusbmax_set_noaicl(chip, iusbmax);
+			pr_err("%s aicl end 1500ma_2,chg_vol:%d,iusbmax:%d\n",
+					__func__,chg_vol,iusbmax);
 			chip->aicl_working = false;
 			bq24196_usb_plugout_check_whenaicl(chip);
 			chip->is_charger_det = 0;
@@ -564,9 +582,10 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 		}
 	}
 	chip->aicl_current = CURRENT_2000MA;
-	bq24196_iusbmax_set_noaicl(chip, chip->aicl_current);
+	iusbmax = min(iusbin_mA, chip->aicl_current);
+	bq24196_iusbmax_set_noaicl(chip, iusbmax);
 	chip->aicl_working = false;
-	pr_err("%s  set charger input ccurrent end,set current=2000ma\n",__func__);
+	pr_err("%s aicl end 2000ma,iusbmax:%d\n",__func__,iusbmax);
     chip->is_charger_det = 0;
     return 0;
 }
@@ -574,8 +593,8 @@ int bq24196_set_input_chg_current(struct opchg_charger *chip, int iusbin_mA, boo
 int bq24196_set_float_voltage(struct opchg_charger *chip, int vfloat_mv)
 {
     u8 value;
-
-	if(is_project(OPPO_14037) || is_project(OPPO_15057)){
+/*huqiao@EXP.BasicDrv.Basic add for clone 15085*/
+	if(is_project(OPPO_14037) || is_project(OPPO_15057) || is_project(OPPO_15009) || is_project(OPPO_15037)|| is_project(OPPO_15085)){
 		if((!chip->batt_authen) && (vfloat_mv > chip->non_standard_vfloat_mv))
 			vfloat_mv = chip->non_standard_vfloat_mv;
 	}
@@ -669,6 +688,26 @@ int bq24196_check_charging_pre_full(struct opchg_charger *chip)
     }
     else {
         chip->batt_pre_full = 0;
+    }
+
+    return rc;
+}
+
+int bq24196_check_battovp(struct opchg_charger *chip)
+{
+    int rc = 0;
+	 
+    if(chip->chg_present == true) {
+		rc = opchg_read_reg(chip, REG09_BQ24196_ADDRESS,&reg09_val);
+        if ((reg09_val & REG09_BQ24196_BATTERY_VOLATGE_MASK) == REG09_BQ24196_BATTERY_VOLATGE_HIGH_ERROR){
+            chip->batt_ovp = 1;
+        }
+        else {
+            chip->batt_ovp = 0;
+        }
+    }
+    else {
+        chip->batt_ovp = 0;
     }
 
     return rc;
@@ -831,13 +870,13 @@ int bq24196_chg_uv(struct opchg_charger *chip, u8 status)
     //opchg_set_input_chg_current(chip, chip->max_input_current[INPUT_CURRENT_MIN], true);
 
 	#ifdef OPPO_USE_FAST_CHARGER
-	if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018))
+	if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018) || is_project(OPPO_15022))
 	{
 		opchg_set_switch_mode(NORMAL_CHARGER_MODE);
 	}
 	#endif
 
-	//if(is_project(OPPO_14037) || is_project(OPPO_14051) || is_project(OPPO_15057))
+	//if(is_project(OPPO_14037) || is_project(OPPO_14051) || is_project(OPPO_15057) || is_project(OPPO_15009) || is_project(OPPO_15037))
 	//	opchg_switch_to_usbin(chip,!status);
 
     if (status == 0) {
@@ -880,7 +919,7 @@ int bq24196_chg_uv(struct opchg_charger *chip, u8 status)
 #endif	
 		
 #ifdef OPPO_USE_FAST_CHARGER
-		if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018))
+		if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018) || is_project(OPPO_15022))
 		{
 			reset_fastchg_after_usbout(chip);
 			opchg_config_charging_disable(chip, CHAGER_VOOC_DISABLE, 0);
@@ -892,7 +931,9 @@ int bq24196_chg_uv(struct opchg_charger *chip, u8 status)
     }
     //chip->BMT_status.charger_exist = chip->chg_present;
     power_supply_changed(chip->usb_psy);
-	if(is_project(OPPO_15011)){
+
+	/*#hanqing.wang@EXP.BasicDrv.Audio add for clone 15089 and add the macor MSM_15062 and OPPO_15011 = OPPO_15018*/
+	if(is_project(OPPO_15018)||is_project(OPPO_15011) ||is_project(OPPO_15022)){
 		schedule_work(&chip->opchg_modify_tp_param_work);
 	}
     //dev_dbg(chip->dev, "chip->chg_present = %d\n", chip->chg_present);
@@ -1004,7 +1045,7 @@ void bq24196_chg_irq_handler(int irq, struct opchg_charger *chip)
 		handler_count++;
 		if (chip->chg_present == true) {
 			// if fast_charging not response usb init
-			if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018)) {
+			if(is_project(OPPO_14005)||is_project(OPPO_14023)||is_project(OPPO_15011)|| is_project(OPPO_15018) || is_project(OPPO_15022)) {
 				if(opchg_get_prop_fast_chg_started(chip) == false){
 					rc = bq24196_chg_uv(chip, 1);
 				}

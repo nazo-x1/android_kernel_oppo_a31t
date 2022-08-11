@@ -304,6 +304,7 @@ OPPO_BQ24196_EXT int bq24196_set_complete_charge_timeout(struct opchg_charger *c
 OPPO_BQ24196_EXT int bq24196_set_wdt_timer(struct opchg_charger *chip, bool enable);
 OPPO_BQ24196_EXT int bq24196_set_wdt_reset(struct opchg_charger *chip);
 OPPO_BQ24196_EXT int bq24196_check_charging_pre_full(struct opchg_charger *chip);
+OPPO_BQ24196_EXT int bq24196_check_battovp(struct opchg_charger *chip);
 #ifdef BQ24192
 OPPO_BQ24196_EXT int bq24196_set_compenstion_resistor(struct opchg_charger *chip, int reg);
 OPPO_BQ24196_EXT int bq24196_set_compenstion_voltage(struct opchg_charger *chip, int reg);

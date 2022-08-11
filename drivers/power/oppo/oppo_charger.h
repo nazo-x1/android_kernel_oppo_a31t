@@ -26,6 +26,8 @@ OPCHG_UNKOWN_ID,
 OPCHG_SMB358_ID,
 OPCHG_SMB1357_ID,
 OPCHG_BQ24196_ID,
+OPCHG_BQ24157_ID,
+OPCHG_BQ24188_ID,
 };
 #if 0
 enum {
@@ -44,10 +46,13 @@ OPCHG_VOOC_IN_FAST,			// fast charging is in fast charging
 #endif
 
 #define CURRENT_500MA				500
+#define CURRENT_800MA				800
 #define CURRENT_900MA				900
 #define CURRENT_1200MA				1200
 #define CURRENT_1500MA				1500
+#define CURRENT_1950MA				1950
 #define CURRENT_2000MA				2000
+#define CURRENT_2500MA				2500
 
 struct smb_irq_info {
     const char                      *name;
@@ -91,6 +96,7 @@ OPPO_CHARGER_EXT int opchg_get_initial_state(struct opchg_charger *chip);
 OPPO_CHARGER_EXT void opchg_set_wdt_reset(struct opchg_charger *chip);
 OPPO_CHARGER_EXT void opchg_set_wdt_timer(struct opchg_charger *chip, bool enable);
 OPPO_CHARGER_EXT int opchg_check_charging_pre_full(struct opchg_charger *chip);
+OPPO_CHARGER_EXT int opchg_check_battovp(struct opchg_charger *chip);
 OPPO_CHARGER_EXT irqreturn_t opchg_chg_irq_handler(int irq, void *dev_id);
 OPPO_CHARGER_EXT void opchg_dump_regs(struct opchg_charger *chip);
 OPPO_CHARGER_EXT int qpnp_charger_type_get(struct opchg_charger *chip);
@@ -103,4 +109,6 @@ OPPO_CHARGER_EXT int opchg_get_otg_enable(void);
 #endif
 OPPO_CHARGER_EXT void opchg_set_vindpm_vol(struct opchg_charger *chip, int mV);
 
+extern int opchg_get_charger_inout(void);
+extern int opchg_get_charger_inout_cblpwr(void);
 #endif /*_OPPO_CHARGER_H_*/

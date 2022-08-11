@@ -147,11 +147,17 @@
 #include <oppo_smb358.h>
 #include <oppo_smb1357.h>
 #include <oppo_bq24196.h>
+#include <oppo_bq24157.h>
+#include <oppo_bq24188.h>
 #include <oppo_bq27541.h>
 #include <oppo_bq2022a.h>
 #include <oppo_vooc.h>
-#include <mach/oppo_boot_mode.h>
-#include <mach/oppo_project.h>
+//#include <mach/oppo_boot_mode.h>
+//#include <mach/oppo_project.h>
+
+#include <soc/oppo/boot_mode.h>
+#include <soc/oppo/oppo_project.h>
+#include <soc/oppo/device_info.h>
 
 
 #ifdef OPPO_USE_QCOMM
